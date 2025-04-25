@@ -30,7 +30,7 @@ public class TemperatureApiCall implements Runnable{
 
     private Double get_temperature(String cityName) throws IOException {
 
-        String apiKey = "43ec6b5099224fa4b7f132529252504";
+        String apiKey = "zupa";
         String urlString = "http://api.weatherapi.com/v1/current.json?key=" + apiKey + "&q=" + cityName + "&aqi=no";
 
         URL url = new URL(urlString);
