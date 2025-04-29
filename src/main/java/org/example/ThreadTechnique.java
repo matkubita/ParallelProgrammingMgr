@@ -1,9 +1,16 @@
 package org.example;
+
+import com.sun.management.OperatingSystemMXBean;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ThreadTechnique {
+
     public static void main(String[] args) {
 
         List<String> cityNames = new ArrayList<>();
@@ -29,9 +36,17 @@ public class ThreadTechnique {
             cityNames.add("Sacramento");
             cityNames.add("Atlanta");
             cityNames.add("Miami");
-
         }
+
         ConcurrentLinkedQueue<Double> temperatureResults = new ConcurrentLinkedQueue<>();
+
+        // Profiler: CPU and thread states BEFORE execution
+        ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+        OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        long[] threadIdsBefore = threadBean.getAllThreadIds();
+        ThreadInfo[] threadInfosBefore = threadBean.getThreadInfo(threadIdsBefore);
+
+        double cpuLoadBefore = osBean.getSystemCpuLoad();
 
         System.out.println("Uruchamianie wątków...");
         long startTime = System.nanoTime();
@@ -54,18 +69,60 @@ public class ThreadTechnique {
         long endTime = System.nanoTime();
         System.out.println("Wszystkie wątki zakończone.");
 
+        // Profiler: CPU and thread states AFTER execution
+        long[] threadIdsAfter = threadBean.getAllThreadIds();
+        ThreadInfo[] threadInfosAfter = threadBean.getThreadInfo(threadIdsAfter);
+
+        double cpuLoadAfter = osBean.getSystemCpuLoad();
+
         double sum = 0;
         int count = 0;
-
         for (Double temp : temperatureResults) {
             sum += temp;
             count++;
         }
-        System.out.println(sum/count);
 
+        double average = sum / count;
         double durationInSeconds = (endTime - startTime) / 1_000_000_000.0;
+
+        System.out.printf("\nUdało się pobrać %d wyników.%n", count);
+        System.out.printf("Średnia temperatura: %.2f °C%n", average);
+
+        // Display profiling results
+        System.out.println("\n=== Profiling Summary ===");
+
         System.out.printf("Całkowity czas wykonania (podejście klasyczne): %.3f s%n", durationInSeconds);
+        System.out.printf("CPU load before: %.2f%%%n", cpuLoadBefore * 100);
+        System.out.printf("CPU load after: %.2f%%%n", cpuLoadAfter * 100);
 
+        int newThreadsCreated = threadIdsAfter.length - threadIdsBefore.length;
+        System.out.println("Number of threads before: " + threadIdsBefore.length);
+        System.out.println("Number of threads after: " + threadIdsAfter.length);
+        System.out.println("New threads created during execution: " + newThreadsCreated);
 
+        int runnableCount = 0;
+        int blockedCount = 0;
+        int waitingCount = 0;
+        int timedWaitingCount = 0;
+        int terminatedCount = 0;
+
+        for (ThreadInfo info : threadInfosAfter) {
+            if (info == null) continue;
+            switch (info.getThreadState()) {
+                case RUNNABLE -> runnableCount++;
+                case BLOCKED -> blockedCount++;
+                case WAITING -> waitingCount++;
+                case TIMED_WAITING -> timedWaitingCount++;
+                case TERMINATED -> terminatedCount++;
+                default -> {}
+            }
+        }
+
+        System.out.println("Thread States After Execution:");
+        System.out.println("Runnable: " + runnableCount);
+        System.out.println("Blocked: " + blockedCount);
+        System.out.println("Waiting: " + waitingCount);
+        System.out.println("Timed Waiting: " + timedWaitingCount);
+        System.out.println("Terminated: " + terminatedCount);
     }
 }
