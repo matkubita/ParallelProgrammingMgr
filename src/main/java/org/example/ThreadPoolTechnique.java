@@ -42,7 +42,8 @@ public class ThreadPoolTechnique {
 
         ConcurrentLinkedQueue<Double> temperatureResults = new ConcurrentLinkedQueue<>();
         // Tworzenie puli wątków
-        ExecutorService executor = Executors.newCachedThreadPool();
+        int numberOfThreads = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(numberOfThreads);
 
         // Profilowanie: stan wątków i obciążenie CPU przed wykonaniem
         ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
