@@ -49,6 +49,40 @@ public class ThreadTechnique {
 
         double cpuLoadBefore = osBean.getSystemCpuLoad();
 
+        // Wątek monitorujący działanie aplikacji
+        Thread monitoringThread = new Thread(() -> {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    double currentCpuLoad = osBean.getSystemCpuLoad() * 100;
+                    long[] threadIds = threadBean.getAllThreadIds();
+                    ThreadInfo[] infos = threadBean.getThreadInfo(threadIds);
+
+                    int runnable = 0, blocked = 0, waiting = 0, timedWaiting = 0;
+
+                    for (ThreadInfo info : infos) {
+                        if (info == null) continue;
+                        switch (info.getThreadState()) {
+                            case RUNNABLE -> runnable++;
+                            case BLOCKED -> blocked++;
+                            case WAITING -> waiting++;
+                            case TIMED_WAITING -> timedWaiting++;
+                            default -> {}
+                        }
+                    }
+
+                    System.out.printf("[Monitor] CPU: %.2f%% | Threads - RUNNABLE: %d, BLOCKED: %d, WAITING: %d, TIMED_WAITING: %d%n",
+                            currentCpuLoad, runnable, blocked, waiting, timedWaiting);
+
+                    Thread.sleep(100);
+                }
+            } catch (InterruptedException e) {
+                // Monitoring zakończony poprawnie
+            }
+        });
+        monitoringThread.setDaemon(true); // Nie blokuje zakończenia JVM
+        monitoringThread.start();
+
+
         System.out.println("Uruchamianie wątków...");
         long startTime = System.nanoTime();
 
@@ -71,6 +105,8 @@ public class ThreadTechnique {
 
         long endTime = System.nanoTime();
         System.out.println("Wszystkie wątki zakończone.");
+        monitoringThread.interrupt(); // zatrzymanie wątku monitorującego
+
 
         // Profilowanie: stan CPU i wątków PO wykonaniu
         long[] threadIdsAfter = threadBean.getAllThreadIds();
@@ -102,7 +138,6 @@ public class ThreadTechnique {
         int newThreadsCreated = threadIdsAfter.length - threadIdsBefore.length;
         System.out.println("Liczba wątków przed: " + threadIdsBefore.length);
         System.out.println("Liczba wątków po: " + threadIdsAfter.length);
-        System.out.println("Nowo utworzone wątki podczas wykonania: " + newThreadsCreated);
 
         // Liczenie stanów wątków po wykonaniu
         int runnableCount = 0;

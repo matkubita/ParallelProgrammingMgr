@@ -16,9 +16,8 @@ public class ThreadPoolTechnique {
 
     public static void main(String[] args) {
 
-        List<String> cityNames = new ArrayList<>();
-
         // Dodawanie nazw miast do listy
+        List<String> cityNames = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
             cityNames.add("Austin");
             cityNames.add("Houston");
@@ -42,10 +41,8 @@ public class ThreadPoolTechnique {
         }
 
         ConcurrentLinkedQueue<Double> temperatureResults = new ConcurrentLinkedQueue<>();
-        int numberOfThreads = 10;
-
-        // Tworzenie puli wątków o stałej liczbie wątków
-        ExecutorService executor = Executors.newFixedThreadPool(numberOfThreads);
+        // Tworzenie puli wątków
+        ExecutorService executor = Executors.newCachedThreadPool();
 
         // Profilowanie: stan wątków i obciążenie CPU przed wykonaniem
         ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
@@ -53,9 +50,41 @@ public class ThreadPoolTechnique {
         long[] threadIdsBefore = threadBean.getAllThreadIds();
         ThreadInfo[] threadInfosBefore = threadBean.getThreadInfo(threadIdsBefore);
 
-        double cpuLoadBefore = osBean.getSystemCpuLoad(); // Wartość z przedziału 0.0 - 1.0
+        double cpuLoadBefore = osBean.getSystemCpuLoad();
 
-        System.out.println("Przesyłanie zadań do puli wątków (rozmiar puli: " + numberOfThreads + ")...");
+        // Wątek monitorujący
+        Thread monitoringThread = new Thread(() -> {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    double currentCpuLoad = osBean.getSystemCpuLoad() * 100;
+                    long[] threadIds = threadBean.getAllThreadIds();
+                    ThreadInfo[] infos = threadBean.getThreadInfo(threadIds);
+
+                    int runnable = 0, blocked = 0, waiting = 0, timedWaiting = 0;
+
+                    for (ThreadInfo info : infos) {
+                        if (info == null) continue;
+                        switch (info.getThreadState()) {
+                            case RUNNABLE -> runnable++;
+                            case BLOCKED -> blocked++;
+                            case WAITING -> waiting++;
+                            case TIMED_WAITING -> timedWaiting++;
+                            default -> {}
+                        }
+                    }
+
+                    System.out.printf("[Monitor] CPU: %.2f%% | Threads - RUNNABLE: %d, BLOCKED: %d, WAITING: %d, TIMED_WAITING: %d%n",
+                            currentCpuLoad, runnable, blocked, waiting, timedWaiting);
+
+                    Thread.sleep(100);
+                }
+            } catch (InterruptedException e) {
+                // Monitoring zakończony
+            }
+        });
+        monitoringThread.setDaemon(true); // Nie blokuje zakończenia JVM
+        monitoringThread.start();
+
         long startTime = System.nanoTime();
 
         // Przesyłanie zadań do puli wątków
@@ -80,6 +109,8 @@ public class ThreadPoolTechnique {
         }
 
         long endTime = System.nanoTime();
+        monitoringThread.interrupt(); // Zakończenie monitoringu po zakończeniu puli
+
         System.out.println("Pula wątków zakończyła pracę.");
 
         // Profilowanie: stan wątków i obciążenie CPU po wykonaniu
@@ -105,7 +136,7 @@ public class ThreadPoolTechnique {
         System.out.printf("Średnia temperatura: %.2f °C%n", average);
 
         // Wyświetlanie wyników profilowania
-        System.out.println("\n=== Podsumowanie profilowania ===");
+        System.out.println("\n=== Profiling Summary ===");
 
         System.out.printf("Całkowity czas wykonania (podejście ExecutorService): %.3f s%n", durationInSeconds);
         System.out.printf("Obciążenie CPU przed wykonaniem: %.2f%%%n", cpuLoadBefore * 100);
@@ -114,9 +145,8 @@ public class ThreadPoolTechnique {
         int newThreadsCreated = threadIdsAfter.length - threadIdsBefore.length;
         System.out.println("Liczba wątków przed: " + threadIdsBefore.length);
         System.out.println("Liczba wątków po: " + threadIdsAfter.length);
-        System.out.println("Nowo utworzone wątki podczas wykonania: " + newThreadsCreated);
 
-        // Liczenie stanów wątków po zakończeniu pracy
+        // Liczenie stanów wątków
         int runnableCount = 0;
         int blockedCount = 0;
         int waitingCount = 0;
